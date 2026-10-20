@@ -119,6 +119,7 @@ py -3.12 tools/adaptive_eval.py                     # 场景自适应帧率/toke
 - **场景自适应**（暗适应）：静态/低变化自动降帧与压缩，动态自动提高采样与质量，带滞回避免抖动。
 - **实测**：CAD 9 题命中 4/9 → 7/9，每命中 token −20%，单请求全部 ≤1,800；低变化场景帧数 −27.5%、token −32%，动态场景不降级。
 - 设计说明：[`docs/biomimicry.md`](docs/biomimicry.md) · 变焦预算：[`reports/fovea_budget.md`](reports/fovea_budget.md) · 自适应：[`reports/adaptive.md`](reports/adaptive.md)
+- 完整项目开发报告（V1 + A/B/C）：[`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md)
 
 ## 边界（重要）
 

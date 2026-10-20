@@ -1,0 +1,82 @@
+# 虚拟视网膜（Vision Retina）— 客户配置
+# 只改这个文件 + config/secrets.local.env，不需要写代码。
+# 所有字段都有内置默认值，缺省即可运行。
+
+capture:
+  source: desktop          # desktop | camera
+  backend: auto            # auto | dxgi | gdi（gdi 为兼容兜底，不支持 dirty-rects）
+  output_index: 0          # 多显示器：0=主屏
+  fps: 2.0                 # 采集帧率（Phase 1 建议 1~2）
+  ring_size: 8             # 环形缓冲帧数
+  region: null             # 隐私白名单 [x, y, w, h]（物理像素）；null=整屏
+
+camera:
+  index: 0                 # OpenCV 摄像头序号（UVC）
+  path: null               # 可选：视频文件路径；无摄像头时用它做联调/回归（优先生效）
+  width: 1280
+  height: 720
+  fps: 30
+
+bus:
+  mode: delta              # full（每次都等新帧）| delta（默认：无变化直接返回 unchanged）
+  keyframe_interval_s: 30  # 定期补关键帧，防漂移
+  silence_timeout_s: 3.0   # 静止超过该时长则静默（零推送）
+  delta_threshold: 12      # 像素差分阈值（0~255）
+  change_min_ratio: 0.002  # 变化块占比低于该值视为"没变"（抑制光标抖动）
+  diff_grid: 32            # 差分网格边长（像素）
+  fovea:
+    enabled: false         # 旧版固定中央凹压缩（保留兼容）
+    focus: mouse           # mouse | center
+    radius: 240            # 注视区半径（像素）
+    scale: 0.66            # 注视区降采样比例
+    mode: crop             # crop（当前实现：围绕焦点裁剪）
+    # 仿生双路 + 指令式变焦（V1.2–V1.4）
+    low_width: 768         # 视杆：全帧低清宽度
+    low_quality: 72
+    focus_max_width: 1024  # 视锥：焦点高清最大宽度
+    focus_quality: 88
+    max_scale: 2.0         # 焦点放大倍数上限
+    budget_tokens: 1200    # 双路总 token 预算（估算口径）
+    max_area_ratio: 0.45   # 单次变焦最多占画面比例
+
+# ---- 场景自适应编码（仿暗适应，V1.5）----
+adaptive:
+  enabled: true
+  static_ratio: 0.006      # EMA 变化率低于此值 → 趋向静态（覆盖低变化场景）
+  static_exit_ratio: 0.010 # 静态档退出阈值（滞回）
+  dynamic_ratio: 0.02      # 高于此值 → 趋向动态
+  dynamic_exit_ratio: 0.008
+  enter_static_s: 3.0      # 连续静态多久进入静态档
+  enter_dynamic_s: 0.4     # 连续动态多久进入动态档
+  ema_alpha: 0.3
+  static:  {fps: 1.0, quality: 60, max_width: 1000, silence_timeout_s: 6.0}
+  normal:  {fps: 2.0, quality: 80, max_width: 1280, silence_timeout_s: 3.0}
+  dynamic: {fps: 6.0, quality: 86, max_width: 1600, silence_timeout_s: 2.0}
+
+encode:
+  format: jpeg             # jpeg | png
+  quality: 80
+  max_width: 1280          # 送给模型的最大宽度（0=不缩放）
+
+brain:
+  # 不在此写死厂商：base_url / model / key 由 config/secrets.local.env
+  # 或环境变量 VISION_API_BASE / VISION_MODEL / VISION_API_KEY 提供。
+  base_url: ""
+  model: ""
+  api_key_env: VISION_API_KEY
+  temperature: 0.2
+  timeout_s: 60
+  max_tokens: 1024
+  image_format: auto       # auto | data_uri | base64（部分厂商要求裸 base64）
+  system_prompt: "你是一台视觉外设的感知后端。你看到的是用户桌面的实时截图。请直接、具体地回答，不要寒暄。"
+
+hand:
+  server_name: virtual-retina
+  ws:
+    host: 127.0.0.1
+    port: 8765
+
+safety:
+  region_whitelist: null   # 与 capture.region 联动；null=不限制
+  persist_frames: false    # true 才把帧落盘（默认仅内存）
+  allow_record: false

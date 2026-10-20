@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# 本地密钥（绝不入库）
+config/secrets.local.env
+*.local.env
+
+# 运行产物
+artifacts/
+_tmp/
+*.log
+
+# 探针
+_probe_*.png
+
+# DSH 一次性调试脚本（不进公开仓库）
+tools/_*.py

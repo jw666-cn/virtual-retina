@@ -1,0 +1,10 @@
+# 虚拟视网膜运行时依赖（Windows，Python 3.12）
+# 说明：DXGI/D3D11 采集用 ctypes 直接调系统 DLL，不依赖第三方抓屏库。
+numpy>=2.0
+opencv-python>=4.10        # 摄像头采集（Phase 3）；桌面采集不依赖它
+pillow>=11.0               # 仅用于样张落盘/坐标核对
+openai>=1.40               # 可选：OpenAI 兼容客户端（本实现默认直接走 httpx）
+httpx>=0.27                # 大脑 API 调用
+websockets>=13.0           # WebSocket 兜底协议
+mcp>=1.2                   # 手接入协议（MCP Server）
+PyYAML>=6.0                # 配置文件

@@ -93,7 +93,9 @@ class RetinaService:
         self._region: tuple[int, int, int, int] | None = None
         self._encode_cache: tuple[bytes, bytes, str] | None = None
         self._bionic: BionicRetina | None = None
-        self._counters = {"observe": 0, "ask": 0, "fovea": 0, "errors": 0, "encode": 0, "encode_hits": 0}
+        self._optic_nerve = None
+        self._counters = {"observe": 0, "ask": 0, "fovea": 0, "errors": 0, "encode": 0,
+                          "encode_hits": 0, "convert": 0}
 
     # ---- 生命周期 ----
 
@@ -244,6 +246,59 @@ class RetinaService:
             reply = self.brain.ask_actions(frame, task)
             self._counters["ask"] += 1
             return AskResult(reply=reply, observation=observe.meta(), frame_id=frame.frame_id, cached_frame=cached)
+
+    # ---- 视神经转化（OpticNerve）：采一帧 → 对大脑最优的表示 ----
+
+    @property
+    def optic_nerve(self):
+        """本服务使用的转化引擎；首次访问按 config 的 ``optic_nerve`` 段构造。"""
+        if self._optic_nerve is None:
+            from .optic_nerve import OpticNerve
+
+            self._optic_nerve = OpticNerve(config=self.config)
+        return self._optic_nerve
+
+    def perceive(self, *, force_keyframe: bool | None = None, include_image: bool = False,
+                 **kwargs: Any) -> dict[str, Any]:
+        """采一帧交给视神经，返回"喂给大脑"的最佳形态（不调用大脑、不额外花 token）。
+
+        ``include_image=True`` 时附带 base64 编码帧，便于直接转发给 OpenAI 兼容接口；
+        未变化的静默帧返回 ``{"ok": True, "skipped": True, ...}``（零 token）。
+        """
+        with self._lock:
+            observe = self.observe(include_image=False, force_keyframe=force_keyframe)
+            profile = getattr(self.bus, "scene_profile", None)
+            result = self.optic_nerve.convert_observation(
+                observe.observation,
+                scene=profile.to_dict() if profile is not None else None,
+                **kwargs,
+            )
+            self._counters["convert"] += 1
+            payload: dict[str, Any] = {
+                "ok": True,
+                "skipped": result is None,
+                "observation": observe.meta(),
+                "frame_id": observe.observation.frame.frame_id if observe.has_image else None,
+                "scene": profile.to_dict() if profile is not None else None,
+            }
+            if result is None:
+                payload["reason"] = observe.observation.kind
+                return payload
+            payload.update(result.to_dict())
+            payload["converter"] = result.converter
+            payload["tokens"] = result.tokens.to_dict() if result.tokens else None
+            if result.image is not None:
+                image = result.image
+                payload["image"] = {
+                    "width": image.width,
+                    "height": image.height,
+                    "mime": image.mimetype,
+                    "bytes": len(image.data),
+                    "strategy": image.strategy,
+                }
+                if include_image:
+                    payload["image"]["base64"] = image.to_base64()
+            return payload
 
     # ---- 区域与元信息 ----
 

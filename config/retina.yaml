@@ -58,6 +58,34 @@ encode:
   quality: 80
   max_width: 1280          # 送给模型的最大宽度（0=不缩放）
 
+# ---- 视神经转化引擎（OpticNerve，V2.0）----
+# 视网膜与大脑之间的实时转化层：任何输入 → 对当前大脑最优的形态。
+# 画面只输出「增强像素 / 稀疏编码」，绝不把画面转文本；文档类才出 markdown。
+optic_nerve:
+  mode: auto               # auto | sparse | full | dual（auto：静态/普通走 sparse，动态走 full）
+  max_tokens: 900          # 单帧视觉载荷 token 预算（估算口径，超了先收紧超分再丢低显著度块）
+  target_ratio: 0.62       # 稀疏编码目标面积占比（图形/混合画面按它收预算）
+  baseline_width: 1280     # 不改造时大脑收到的宽度——token 基线就是按它算的
+  enhance: true            # 对比度拉伸 + 光照均衡 + 锐化
+  sharpen: 0.62
+  min_text_px: 16          # 估计字高小于该值 → 该块单独超分（小字可读性）
+  max_scale_up: 2.0
+  sparse: true             # false 则退回整帧缩放
+  gap: 6                   # 马赛克块间距（像素）
+  max_blocks: 48
+  min_block_area: 256
+  keep_floor: 0.2          # 预算再紧也至少保留 20% 的块（防丢关键内容）
+  dynamic_keep: 0.85
+  dirty_bonus: 0.35        # 脏矩形内块的关注度加权（增量帧只传变化区）
+  jpeg_quality: 82
+  png: false
+  min_output_width: 360
+  max_output_width: 1280
+  low_width: 640           # dual 模式：视杆全帧低清
+  low_quality: 72
+  focus_max_width: 960     # dual 模式：视锥焦点高清
+  focus_quality: 88
+
 brain:
   # 不在此写死厂商：base_url / model / key 由 config/secrets.local.env
   # 或环境变量 VISION_API_BASE / VISION_MODEL / VISION_API_KEY 提供。

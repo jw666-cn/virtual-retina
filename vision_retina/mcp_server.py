@@ -4,6 +4,7 @@
   retina_observe      请求当前画面/增量（可选带图）
   retina_ask          让大脑看画面并回答（可选返回动作 JSON）
   retina_ask_fovea    仿生双路：低清全帧 + 按需焦点高清（受 token 预算约束）
+  retina_perceive     视神经转化：当前帧 → 对大脑最优的稀疏编码增强帧
   retina_set_region   设定采集区域（隐私控制）
   retina_list_sources 列出可用输入源（desktop / camera）
   retina_status       运行状态（诊断扩展，非必需）
@@ -14,6 +15,7 @@
 """
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 
@@ -73,6 +75,25 @@ def build_mcp_server(service: RetinaService, *, name: str = "virtual-retina") ->
     )
     def retina_ask_fovea(prompt: str, budget_tokens: int = 1200) -> str:
         return _json_text(service.ask_fovea(prompt, budget_tokens=budget_tokens))
+
+    @server.tool(
+        description=(
+            "视神经转化（OpticNerve）：把当前帧变成对视觉模型最优的形态再交给大脑。"
+            "返回 JSON + 图片内容块：稀疏编码后的增强帧（小字超分、马赛克坐标可反解），"
+            "token 显著低于整帧；未变化的静默帧返回 skipped=true（零 token）。"
+        )
+    )
+    def retina_perceive(include_image: bool = True, force_keyframe: bool = False) -> list[TextContent | ImageContent]:
+        payload = service.perceive(include_image=include_image, force_keyframe=force_keyframe)
+        encoded = None
+        if include_image and isinstance(payload.get("image"), dict):
+            encoded = payload["image"].pop("base64", None)
+        blocks: list[TextContent | ImageContent] = [TextContent(type="text", text=_json_text(payload))]
+        if encoded:
+            blocks.append(
+                Image(data=base64.b64decode(encoded), format="jpeg").to_image_content()
+            )
+        return blocks
 
     @server.tool(
         description=(

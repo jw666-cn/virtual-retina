@@ -8,3 +8,10 @@ httpx>=0.27                # 大脑 API 调用
 websockets>=13.0           # WebSocket 兜底协议
 mcp>=1.2                   # 手接入协议（MCP Server）
 PyYAML>=6.0                # 配置文件
+
+# ---- OpticNerve（视神经转化引擎）可选依赖 ----
+# 不装也能跑：docx/xlsx/epub/html/csv/json/代码/图片/纯文本 均零额外依赖。
+magika>=0.5                # 可选：类型识别（缺失时回退魔数/扩展名推断）
+openpyxl>=3.1              # 可选：.xlsx → 结构化
+pypdf>=5.0                 # 可选：.pdf → markdown（缺失时明确报 MissingDependencyException）
+python-pptx>=0.6.23        # 可选：.pptx → markdown（同上）

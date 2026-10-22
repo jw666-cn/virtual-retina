@@ -56,6 +56,33 @@ DEFAULTS: dict[str, Any] = {
         "dynamic": {"fps": 6.0, "quality": 86, "max_width": 1600, "silence_timeout_s": 2.0},
     },
     "encode": {"format": "jpeg", "quality": 80, "max_width": 1280},
+    # 视神经转化引擎（OpticNerve）：视网膜与大脑之间的转化层。
+    # 画面只输出增强像素/稀疏编码，文档类才转 markdown。
+    "optic_nerve": {
+        "mode": "auto",  # auto | sparse | full | dual
+        "max_tokens": 900,
+        "target_ratio": 0.62,
+        "baseline_width": 1280,
+        "enhance": True,
+        "sharpen": 0.62,
+        "min_text_px": 16,
+        "max_scale_up": 2.0,
+        "sparse": True,
+        "gap": 6,
+        "max_blocks": 48,
+        "min_block_area": 256,
+        "keep_floor": 0.2,
+        "dynamic_keep": 0.85,
+        "dirty_bonus": 0.35,
+        "jpeg_quality": 82,
+        "png": False,
+        "min_output_width": 360,
+        "max_output_width": 1280,
+        "low_width": 640,
+        "low_quality": 72,
+        "focus_max_width": 960,
+        "focus_quality": 88,
+    },
     "brain": {
         "base_url": "",
         "model": "",

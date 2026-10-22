@@ -87,8 +87,8 @@ class WsServerHandle:
                         "type": "hello",
                         "protocol": PROTOCOL,
                         "service": "vision-retina",
-                        "types": ["observe", "ask", "ask_fovea", "ask_actions", "set_region",
-                                  "list_sources", "status", "health", "ping"],
+                        "types": ["observe", "ask", "ask_fovea", "ask_actions", "perceive",
+                                  "set_region", "list_sources", "status", "health", "ping"],
                     },
                     ensure_ascii=False,
                 )
@@ -146,6 +146,12 @@ class WsServerHandle:
                 raise ValueError("ask_actions 需要 params.task")
             result = await asyncio.to_thread(service.ask_actions, str(task))
             return result.to_dict()
+        if kind == "perceive":
+            return await asyncio.to_thread(
+                service.perceive,
+                force_keyframe=params.get("force_keyframe"),
+                include_image=bool(params.get("include_image", False)),
+            )
         if kind == "set_region":
             region = None
             provided = [params.get(key) for key in ("x", "y", "w", "h")]

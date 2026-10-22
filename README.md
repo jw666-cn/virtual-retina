@@ -51,19 +51,20 @@ MCP 客户端配置示例（stdio）：
 }
 ```
 
-工具：`retina_observe` / `retina_ask` / `retina_ask_fovea` / `retina_set_region` / `retina_list_sources` / `retina_status` / `retina_health`。
+工具：`retina_observe` / `retina_ask` / `retina_ask_fovea` / `retina_perceive` / `retina_set_region` / `retina_list_sources` / `retina_status` / `retina_health`。
 产品只返回标准动作 JSON，**不执行**任何动作；审批与危险操作由客户选择的“手”负责。
 
 ## 架构
 
 ```
-视觉源 → ①采集层 → ②统一输入总线 → ③增量编码 → ④对外标准接口
-                                              ├─► 大脑 API 接入口（OpenAI 兼容）
-                                              └─► 手接入协议（MCP + WebSocket JSON）
+视觉源 → ①采集层 → ②统一输入总线 → ③增量编码 → ③'视神经转化（OpticNerve）→ ④对外标准接口
+                                                          ├─► 大脑 API 接入口（OpenAI 兼容）
+                                                          └─► 手接入协议（MCP + WebSocket JSON）
 ```
 
 总线四机制：帧间差分（dirty-rects）、静默、中央凹、特征缓存；`ask` 每次只带当前一帧，历史不累积图片。
 V1 新增：双路喂图（低清全帧 + 按需焦点高清）、指令式变焦、token 预算联动、场景自适应（static/normal/dynamic）。
+V2 新增：视神经转化引擎 OpticNerve——画面→增强像素/稀疏编码（马赛克帧 + 坐标映射），文档→markdown，表格/代码→结构化；引擎按优先级注册转换器，新内容类型只需加一个 converter。
 
 ## 目录
 
@@ -75,6 +76,7 @@ V1 新增：双路喂图（低清全帧 + 按需焦点高清）、指令式变�
 | `vision_retina/capture/macos.py` / `linux.py` | 三平台接口占位：明确报错，不返回假帧 |
 | `vision_retina/bus.py` | 统一输入总线（关键帧 / 差分 / 静默 / 中央凹 / 自适应节流） |
 | `vision_retina/bionic.py` | 双路喂图 + 指令式变焦 + token 预算 |
+| `vision_retina/optic_nerve.py` | 视神经转化引擎（V2）：画面稀疏编码 / 文档 markdown / 结构化 / 视频关键帧 |
 | `vision_retina/adaptive.py` | 场景自适应（暗适应）：EMA + 滞回三档 |
 | `vision_retina/roi.py` | 语义安全裁剪：文字行/连通块扩展，避免切字 |
 | `vision_retina/service.py` | 采集 + 大脑门面（MCP/WS 共用、编码缓存、区域白名单） |
@@ -89,7 +91,7 @@ V1 新增：双路喂图（低清全帧 + 按需焦点高清）、指令式变�
 ## 验证与验收
 
 ```powershell
-py -3.12 -m unittest discover -s tests -v          # 27 项单测：帧/差分/动作解析/编码缓存/白名单/静默/双路预算/自适应
+py -3.12 -m unittest discover -s tests -v          # 98 项单测：帧/差分/动作解析/编码缓存/白名单/静默/双路预算/自适应/OpticNerve
 py -3.12 tools/probe_capture.py --backend dxgi --frames 20 --fps 2
 py -3.12 tools/probe_bus.py --seconds 6 --fps 2 --fovea --save artifacts/bus_fovea.png
 py -3.12 tools/bench_tokens.py                      # Phase 2 token 基准（5.23x）
@@ -120,6 +122,27 @@ py -3.12 tools/adaptive_eval.py                     # 场景自适应帧率/toke
 - **实测**：CAD 9 题命中 4/9 → 7/9，每命中 token −20%，单请求全部 ≤1,800；低变化场景帧数 −27.5%、token −32%，动态场景不降级。
 - 设计说明：[`docs/biomimicry.md`](docs/biomimicry.md) · 变焦预算：[`reports/fovea_budget.md`](reports/fovea_budget.md) · 自适应：[`reports/adaptive.md`](reports/adaptive.md)
 - 完整项目开发报告（V1 + A/B/C）：[`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md)
+
+## V2 视神经转化引擎（OpticNerve）
+
+视网膜负责"看见"，大脑负责"理解"；OpticNerve 是两者之间的实时转化层：**任何输入 → 对当前大脑最优的形态**。
+
+- **画面不转文本**：输出增强像素 / 稀疏编码马赛克帧（`image_url`），markdown 只用于文档与文本类。
+- **省 token 不靠转文字**：收墨迹（丢掉背景留白/分隔线）→ 分块 → 小字超分 → 增强 → 拼图 → 预算控制；超预算先降超分、再降分辨率、最后才丢冗余块。
+- **坐标可还原**：`result.mapper.to_native_point(x, y)` 把马赛克坐标换回原生像素，跨块矩形取并集。
+- **四类结果**：`markdown` / `image`（增强编码帧）/ `structured`（行列、schema、代码大纲）/ `frame`（视频关键帧）。
+- **保留 MarkItDown 骨架**：`DocumentConverter` 抽象基类、`register_converter` 插件注册、优先级排序、magika 类型识别、`StreamInfo` 全部保留；新增内容类型 = 加一个 converter，引擎本体不动。
+- **实测**：1280×800 桌面（对话框+图标）576→353 token（0.61，8 块全保留、原分辨率）；密排整页 1.0（自动整帧，不硬切）；动态场景不降级；小字低对比帧可读性 0.029→0.224（×7.7）。
+- 设计说明与配置：[`docs/optic_nerve.md`](docs/optic_nerve.md) · 配置段：`config/retina.yaml` 的 `optic_nerve`
+
+```python
+from vision_retina.optic_nerve import default_engine
+
+engine = default_engine()
+result = engine.convert_observation(service.bus.observe())   # unchanged → None（零 token）
+if result is not None:
+    brain.ask_images(result.image_bytes(), "屏幕上的报错是什么？")
+```
 
 ## 边界（重要）
 

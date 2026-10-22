@@ -13,6 +13,8 @@ config/secrets.local.env
 artifacts/
 _tmp/
 *.log
+# 调试日志（显式声明，虽已由 *.log 覆盖，勿入库）
+debug.log
 
 # 探针
 _probe_*.png
